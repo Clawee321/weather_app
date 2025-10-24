@@ -103,7 +103,7 @@ root.geometry("650x700")
 root.resizable(False, False)
 root.configure(bg="lightblue")
 
-title_label = tk.Label(root, text="Sprawdź pogodę", font=("Arial", 16, "bold"), bg="lightblue")
+title_label = tk.Label(root, text="Sprawdź pogodę na świecie", font=("Arial", 16, "bold"), bg="lightblue")
 title_label.pack(pady=10)
 
 city_entry = tk.Entry(root, font=("Arial", 12))
@@ -111,6 +111,7 @@ city_entry.pack(pady=5)
 
 search_button = tk.Button(root, text="Pobierz pogodę", command=get_weather, bg="blue", fg="white")
 search_button.pack(pady=5)
+root.bind("<Return>", lambda event: get_weather())
 
 icon_label = tk.Label(root, bg="lightblue")
 icon_label.pack()
@@ -119,7 +120,7 @@ city_label = tk.Label(root, font=("Arial", 16, "bold"), bg="lightblue")
 city_label.pack()
 
 weather_label = tk.Label(root, font=("Arial", 13), bg="lightblue")
-weather_label.pack(pady=5)
+weather_label.pack(pady=(5,45))
 
 
 # 🔹 Canvas + Scrollbar dla prognozy z niebieskim tłem

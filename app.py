@@ -14,6 +14,10 @@ forecast_icons_24h = []
 forecast_icons_5d = []
 forecast_data_global = None
 
+# Ikony (trzymaj spacje jeśli chcesz, żeby tekst się nie przesuwał)
+OPEN_ICON = "🔽   "   # gdy sekcja jest otwarta (z zachowanymi spacjami)
+CLOSED_ICON = "▶️"    # gdy sekcja jest zamknięta
+
 # --- wczytaj dane o miastach ---
 cities_df = pd.read_csv("openweathermap_city_list.csv", usecols=["city_name","country"])
 cities_df["city_name"] = cities_df["city_name"].astype(str)
@@ -36,6 +40,48 @@ def _bind_mousewheel(widget, canvas):
 def _on_mousewheel(event, canvas):
     # Uniwersalna obsługa kółka myszy
     canvas.yview_scroll(-1 * int(event.delta / 120), "units")
+
+def close_all_forecasts():
+    """
+    Jednoznacznie zamyka i czyści wszystkie sekcje prognoz
+    oraz ustawia ikonki nagłówków na CLOSED_ICON.
+    """
+    global forecast_icons_24h, forecast_icons_5d
+    pairs = (
+        (forecast_24h_frame, forecast_icons_24h),
+        (forecast_5d_frame, forecast_icons_5d),
+    )
+    for f, icons in pairs:
+        try:
+            # ustaw flagę jako 'zamknięta' i chowanie ramki
+            f.forget_flag = True
+            f.pack_forget()
+
+            # niszczenie zawartości (canvas / widgety wewnątrz)
+            for w in f.winfo_children():
+                try:
+                    w.destroy()
+                except Exception:
+                    pass
+
+            # czyść ikony
+            icons.clear()
+
+            # ustaw ikonę nagłówka na zamkniętą (jeśli header został przypisany)
+            if hasattr(f, "header") and hasattr(f.header, "icon_label"):
+                try:
+                    f.header.icon_label.config(text=CLOSED_ICON)
+                except Exception:
+                    pass
+        except Exception:
+            # ignoruj błędy pojedynczego frame
+            pass
+
+    # natychmiast odśwież GUI
+    try:
+        root.update_idletasks()
+    except Exception:
+        pass
 
 # ---------- Sugestie miast ----------
 
@@ -122,26 +168,8 @@ def get_weather():
         forecast_response = requests.get(FORECAST_URL, params=params, timeout=10)
         forecast_data_global = forecast_response.json()
 
-        # --- dodatkowe zachowanie: przy nowym wyszukaniu chowamy rozwinięte sekcje ---
-        # Ustawiamy flagi i chowamy ramki oraz czyścimy ich zawartość i ikony
-        try:
-            for f, icons in ((forecast_24h_frame, forecast_icons_24h), (forecast_5d_frame, forecast_icons_5d)):
-                # ukryj ramkę
-                f.forget_flag = True
-                f.pack_forget()
-                # usuń zawartość wewnętrzną (canvas/labels) jeśli istnieje
-                for w in f.winfo_children():
-                    w.destroy()
-                # zresetuj ikony
-                icons.clear()
-                # zaktualizuj ikonę nagłówka (jeśli header został przypisany)
-                if hasattr(f, 'header') and hasattr(f.header, 'icon_label'):
-                    try:
-                        f.header.icon_label.config(text="▶️")
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        # Po pobraniu nowych danych: zamknij i wyczyść poprzednie sekcje prognoz
+        close_all_forecasts()
 
     except Exception as e:
         messagebox.showerror("Błąd", f"Wystąpił problem:\n{e}")
@@ -232,16 +260,19 @@ def create_expandable_section(parent, title, hours, frame_forecast):
     def toggle():
         if frame_forecast.forget_flag:
             frame_forecast.forget_flag = False
-            icon_label.config(text="🔽   ")
+            icon_label.config(text=OPEN_ICON)
             toggle_forecast(frame_forecast, hours, header)
         else:
             frame_forecast.forget_flag = True
-            icon_label.config(text="▶️")
+            icon_label.config(text=CLOSED_ICON)
             frame_forecast.pack_forget()
 
     header.bind("<Button-1>", lambda e: toggle())
     icon_label.bind("<Button-1>", lambda e: toggle())
     title_label.bind("<Button-1>", lambda e: toggle())
+
+    frame_forecast.header = header
+    header.icon_label = icon_label
 
     return frame_forecast
 

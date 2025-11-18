@@ -122,6 +122,27 @@ def get_weather():
         forecast_response = requests.get(FORECAST_URL, params=params, timeout=10)
         forecast_data_global = forecast_response.json()
 
+        # --- dodatkowe zachowanie: przy nowym wyszukaniu chowamy rozwinięte sekcje ---
+        # Ustawiamy flagi i chowamy ramki oraz czyścimy ich zawartość i ikony
+        try:
+            for f, icons in ((forecast_24h_frame, forecast_icons_24h), (forecast_5d_frame, forecast_icons_5d)):
+                # ukryj ramkę
+                f.forget_flag = True
+                f.pack_forget()
+                # usuń zawartość wewnętrzną (canvas/labels) jeśli istnieje
+                for w in f.winfo_children():
+                    w.destroy()
+                # zresetuj ikony
+                icons.clear()
+                # zaktualizuj ikonę nagłówka (jeśli header został przypisany)
+                if hasattr(f, 'header') and hasattr(f.header, 'icon_label'):
+                    try:
+                        f.header.icon_label.config(text="▶️")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
     except Exception as e:
         messagebox.showerror("Błąd", f"Wystąpił problem:\n{e}")
 

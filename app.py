@@ -1,3 +1,8 @@
+import os
+
+os.environ["TCL_LIBRARY"] = r"C:\Users\Wiktor\AppData\Local\Programs\Python\Python313\tcl\tcl8.6"
+os.environ["TK_LIBRARY"]  = r"C:\Users\Wiktor\AppData\Local\Programs\Python\Python313\tcl\tk8.6"
+
 import tkinter as tk
 from tkinter import messagebox
 import requests
@@ -9,6 +14,12 @@ import sys
 API_KEY = "9f5d80b974ba325f52a205863ee448c6"
 CURRENT_URL = "https://api.openweathermap.org/data/2.5/weather"
 FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
+
+BG_PRIMARY = "#0f172a"
+BG_CARD = "#1e293b"
+ACCENT = "#38bdf8"
+TEXT_PRIMARY = "#e2e8f0"
+TEXT_MUTED = "#94a3b8"
 
 forecast_icons_24h = []
 forecast_icons_5d = []
@@ -200,11 +211,11 @@ def toggle_forecast(frame, hours, header):
     icons_list.clear()
 
     # Tworzymy canvas, który będzie poziomo przewijalny jeśli inner będzie szerszy niż canvas.
-    canvas = tk.Canvas(frame, bg="lightblue", highlightthickness=0)
-    h_scrollbar = tk.Scrollbar(frame, orient="horizontal", command=canvas.xview)
+    canvas = tk.Canvas(frame, bg=BG_CARD, highlightthickness=0, borderwidth=0)
+    h_scrollbar = tk.Scrollbar(frame, orient="horizontal", command=canvas.xview, troughcolor=BG_CARD)
     canvas.configure(xscrollcommand=h_scrollbar.set)
 
-    inner = tk.Frame(canvas, bg="lightblue")
+    inner = tk.Frame(canvas, bg=BG_CARD)
     canvas.create_window((0, 0), window=inner, anchor="nw")
 
     # Nie wymuszamy szerokości okna wewnętrznego na szerokość canvas — dzięki temu
@@ -228,13 +239,13 @@ def toggle_forecast(frame, hours, header):
         icon_photo_f = ImageTk.PhotoImage(icon_img_f)
         icons_list.append(icon_photo_f)
 
-        col = tk.Frame(inner, bg="lightblue")
+        col = tk.Frame(inner, bg=BG_CARD)
         # Ustawiamy grid tak aby kolumny były obok siebie i rozkładały się równomiernie
         col.grid(row=0, column=i, padx=5, pady=5, sticky="n")
-        tk.Label(col, text=time, bg="lightblue", font=("Arial", 10, "bold")).pack()
-        tk.Label(col, image=icon_photo_f, bg="lightblue").pack()
-        tk.Label(col, text=f"{temp_f}°C", bg="lightblue", font=("Arial", 10)).pack()
-        tk.Label(col, text=desc_f, bg="lightblue", font=("Arial", 8), wraplength=120, justify="center").pack()
+        tk.Label(col, text=time, bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 10, "bold")).pack()
+        tk.Label(col, image=icon_photo_f, bg=BG_CARD).pack()
+        tk.Label(col, text=f"{temp_f}°C", bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 10)).pack()
+        tk.Label(col, text=desc_f, bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 9), wraplength=140, justify="center").pack()
 
     # Ustaw scrollregion po ułożeniu elementów
     inner.update_idletasks()
@@ -245,13 +256,13 @@ def toggle_forecast(frame, hours, header):
 
 
 def create_expandable_section(parent, title, hours, frame_forecast):
-    header = tk.Frame(parent, bg="lightblue")
+    header = tk.Frame(parent, bg=BG_CARD)
     header.pack(fill="x", pady=(5, 0))
 
-    icon_label = tk.Label(header, text="▶️", bg="lightblue", fg="black", font=("Arial", 12, "bold"))
+    icon_label = tk.Label(header, text="▶️", bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 12, "bold"))
     icon_label.pack(side="left", padx=5)
 
-    title_label = tk.Label(header, text=title, bg="lightblue", fg="black", font=("Arial", 12, "bold"))
+    title_label = tk.Label(header, text=title, bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 12, "bold"))
     title_label.pack(side="left", padx=5, pady=5)
 
     frame_forecast.pack_forget()
@@ -279,22 +290,22 @@ def create_expandable_section(parent, title, hours, frame_forecast):
 # ---------- GUI (z pionowym scrollbar) ----------
 root = tk.Tk()
 root.title("Aplikacja pogodowa")
-root.geometry("720x850")
-root.configure(bg="lightblue")
+root.geometry("760x600")
+root.configure(bg=BG_PRIMARY)
 
 # Kontener z canvas + vertical scrollbar, aby cała aplikacja miała pionowy scrollbar
-container = tk.Frame(root, bg="lightblue")
-container.pack(fill="both", expand=True)
+container = tk.Frame(root, bg=BG_PRIMARY)
+container.pack(fill="both", expand=True, padx=16, pady=16)
 
-main_canvas = tk.Canvas(container, bg="lightblue", highlightthickness=0)
-v_scrollbar = tk.Scrollbar(container, orient="vertical", command=main_canvas.yview)
+main_canvas = tk.Canvas(container, bg=BG_PRIMARY, highlightthickness=0, borderwidth=0)
+v_scrollbar = tk.Scrollbar(container, orient="vertical", command=main_canvas.yview, troughcolor=BG_PRIMARY)
 main_canvas.configure(yscrollcommand=v_scrollbar.set)
 
 v_scrollbar.pack(side="right", fill="y")
 main_canvas.pack(side="left", fill="both", expand=True)
 
 # inner_frame to miejsce, w którym dodajemy wszystkie widgety aplikacji
-inner_frame = tk.Frame(main_canvas, bg="lightblue")
+inner_frame = tk.Frame(main_canvas, bg=BG_PRIMARY)
 inner_id = main_canvas.create_window((0, 0), window=inner_frame, anchor="nw")
 
 # Aktualizuj scrollregion gdy zawartość się zmienia
@@ -314,43 +325,114 @@ _bind_mousewheel(main_canvas, main_canvas)
 
 # --- Zawartość aplikacji (teraz w inner_frame zamiast root) ---
 
-title_label = tk.Label(inner_frame, text="Sprawdź pogodę na świecie",
-                       font=("Arial", 18, "bold"), bg="lightblue")
-title_label.pack(pady=10)
+card_frame = tk.Frame(
+    inner_frame,
+    bg=BG_CARD,
+    padx=18,
+    pady=18,
+    highlightthickness=1,
+    highlightbackground=ACCENT,
+    bd=0,
+)
+card_frame.pack(fill="both", expand=True, padx=12, pady=12)
+
+title_label = tk.Label(
+    card_frame,
+    text="Sprawdź pogodę na świecie",
+    font=("Segoe UI", 20, "bold"),
+    bg=BG_CARD,
+    fg=TEXT_PRIMARY,
+)
+title_label.pack(pady=(0, 14))
+
+subtitle = tk.Label(
+    card_frame,
+    text="Wpisz nazwę miasta i poznaj aktualną pogodę oraz prognozy",
+    font=("Segoe UI", 11),
+    bg=BG_CARD,
+    fg=TEXT_MUTED,
+)
+subtitle.pack()
+
+# Dekoracyjny separator
+tk.Frame(card_frame, bg=ACCENT, height=2).pack(fill="x", pady=(12, 16))
 
 # Wyszukiwanie
-search_frame = tk.Frame(inner_frame, bg="lightblue")
+search_frame = tk.Frame(card_frame, bg=BG_CARD)
 search_frame.pack(pady=10)
 
-city_entry = tk.Entry(search_frame, font=("Arial", 12), width=30,
-                      relief="groove", borderwidth=3)
-city_entry.grid(row=0, column=0, padx=(0, 5))
+city_entry = tk.Entry(
+    search_frame,
+    font=("Segoe UI", 12),
+    width=30,
+    relief="flat",
+    borderwidth=0,
+    bg="#0b1220",
+    fg=TEXT_PRIMARY,
+    insertbackground=TEXT_PRIMARY,
+)
+city_entry.grid(row=0, column=0, padx=(0, 8), ipady=6)
 
-search_button = tk.Button(search_frame, text="Szukaj", command=get_weather,
-                          bg="#0078D7", fg="white", font=("Arial", 10, "bold"),
-                          relief="groove", borderwidth=3)
+search_button = tk.Button(
+    search_frame,
+    text="Szukaj",
+    command=get_weather,
+    bg=ACCENT,
+    fg=BG_PRIMARY,
+    font=("Segoe UI", 11, "bold"),
+    relief="flat",
+    borderwidth=0,
+    padx=16,
+    pady=6,
+    activebackground="#0ea5e9",
+    activeforeground=BG_PRIMARY,
+    cursor="hand2",
+)
 search_button.grid(row=0, column=1)
 
-suggestion_box = tk.Listbox(root, height=6, width=40, font=("Arial", 11),
-                            borderwidth=2, relief="groove")
+suggestion_box = tk.Listbox(
+    root,
+    height=6,
+    width=40,
+    font=("Segoe UI", 11),
+    borderwidth=0,
+    relief="flat",
+    bg="#0b1220",
+    fg=TEXT_PRIMARY,
+    highlightthickness=1,
+    highlightbackground=ACCENT,
+    selectbackground=ACCENT,
+    selectforeground=BG_PRIMARY,
+)
 suggestion_box.bind("<<ListboxSelect>>", fill_city)
 city_entry.bind("<KeyRelease>", update_suggestions)
 root.bind("<Button-1>", hide_suggestions)
 
-icon_label = tk.Label(inner_frame, bg="lightblue")
-icon_label.pack()
+icon_label = tk.Label(card_frame, bg=BG_CARD)
+icon_label.pack(pady=(8, 0))
 
-city_label = tk.Label(inner_frame, font=("Arial", 16, "bold"), bg="lightblue")
+city_label = tk.Label(
+    card_frame,
+    font=("Segoe UI", 18, "bold"),
+    bg=BG_CARD,
+    fg=TEXT_PRIMARY,
+)
 city_label.pack()
 
-weather_label = tk.Label(inner_frame, font=("Arial", 13), bg="lightblue")
+weather_label = tk.Label(
+    card_frame,
+    font=("Segoe UI", 12),
+    bg=BG_CARD,
+    fg=TEXT_PRIMARY,
+    justify="center",
+)
 weather_label.pack(pady=(5, 20))
 
 # --- Przyciski i ramki w kolejności ---
-forecast_24h_frame = tk.Frame(inner_frame, bg="lightblue")
-forecast_5d_frame = tk.Frame(inner_frame, bg="lightblue")
+forecast_24h_frame = tk.Frame(card_frame, bg=BG_CARD)
+forecast_5d_frame = tk.Frame(card_frame, bg=BG_CARD)
 
-create_expandable_section(inner_frame, "Prognoza 24h", 24, forecast_24h_frame)
-create_expandable_section(inner_frame, "Prognoza 5 dni", 120, forecast_5d_frame)
+create_expandable_section(card_frame, "Prognoza 24h", 24, forecast_24h_frame)
+create_expandable_section(card_frame, "Prognoza 5 dni", 120, forecast_5d_frame)
 
 root.mainloop()

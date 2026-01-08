@@ -121,7 +121,11 @@ def update_suggestions(event):
 
 def fill_city(event):
     try:
-        selected = suggestion_box.get(tk.ACTIVE)
+        selection = event.widget.curselection()
+        if selection:
+            selected = event.widget.get(selection[0])
+        else:
+            selected = suggestion_box.get(tk.ACTIVE)
     except Exception:
         selected = None
     if selected:

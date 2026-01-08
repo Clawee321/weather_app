@@ -5,6 +5,7 @@ from io import BytesIO
 from PIL import Image, ImageTk
 import pandas as pd
 import sys
+import threading
 
 API_KEY = "9f5d80b974ba325f52a205863ee448c6"
 CURRENT_URL = "https://api.openweathermap.org/data/2.5/weather"
@@ -21,6 +22,8 @@ INPUT_BORDER = "#8bbad6"
 forecast_icons_24h = []
 forecast_icons_5d = []
 forecast_data_global = None
+loading_animation_id = None
+forecast_loading_ids = {}
 
 # Ikony (trzymaj spacje jeśli chcesz, żeby tekst się nie przesuwał)
 OPEN_ICON = "🔽   "   # gdy sekcja jest otwarta (z zachowanymi spacjami)
@@ -140,53 +143,160 @@ def hide_suggestions(event):
 
 # ---------- Pobranie pogody ----------
 
-def get_weather():
+def _start_loading_animation(label, base_text, animation_key):
+    def animate(step=0):
+        dots = "." * (step % 4)
+        label.config(text=f"{base_text}{dots}")
+        animation_id = root.after(400, animate, step + 1)
+        forecast_loading_ids[animation_key] = animation_id
+
+    animate()
+
+
+def _stop_loading_animation(animation_key):
+    animation_id = forecast_loading_ids.pop(animation_key, None)
+    if animation_id:
+        root.after_cancel(animation_id)
+
+
+def set_loading(is_loading):
+    global loading_animation_id
+    if is_loading:
+        loading_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        loading_overlay.lift()
+        search_button.config(state="disabled")
+        city_entry.config(state="disabled")
+        suggestion_box.place_forget()
+        if loading_animation_id is None:
+            def animate(step=0):
+                global loading_animation_id
+                dots = "." * (step % 4)
+                loading_label.config(text=f"Ładowanie danych pogody{dots}")
+                loading_animation_id = root.after(400, animate, step + 1)
+
+            animate()
+    else:
+        if loading_animation_id is not None:
+            root.after_cancel(loading_animation_id)
+            loading_animation_id = None
+        loading_overlay.place_forget()
+        search_button.config(state="normal")
+        city_entry.config(state="normal")
+
+
+def _finish_error(message, title="Błąd", kind="error"):
+    set_loading(False)
+    if kind == "warning":
+        messagebox.showwarning(title, message)
+    else:
+        messagebox.showerror(title, message)
+
+
+def _finish_success(city, data, icon_img, forecast_data):
     global forecast_data_global
+
+    temp = data["main"]["temp"]
+    feels_like = data["main"]["feels_like"]
+    humidity = data["main"]["humidity"]
+    wind_speed = data["wind"]["speed"]
+    desc = data["weather"][0]["description"].capitalize()
+
+    city_label.config(text=city.upper())
+    weather_label.config(
+        text=f"{desc}\nTemperatura: {temp}°C (odczuwalna {feels_like}°C)\n"
+             f"Wilgotność: {humidity}%\nWiatr: {wind_speed} m/s"
+    )
+
+    icon_photo = ImageTk.PhotoImage(icon_img)
+    icon_label.config(image=icon_photo)
+    icon_label.image = icon_photo
+
+    forecast_data_global = forecast_data
+
+    # Po pobraniu nowych danych: zamknij i wyczyść poprzednie sekcje prognoz
+    close_all_forecasts()
+    set_loading(False)
+
+
+def get_weather():
     city = city_entry.get().strip()
     if not city:
         messagebox.showwarning("Błąd", "Wpisz nazwę miasta!")
         return
+    set_loading(True)
+    def fetch_weather():
+        params = {"q": city, "appid": API_KEY, "units": "metric", "lang": "pl"}
+        try:
+            response = requests.get(CURRENT_URL, params=params, timeout=10)
+            data = response.json()
+            if data.get("cod") != 200:
+                root.after(0, _finish_error, f"Nie znaleziono miasta: {city}")
+                return
 
-    params = {"q": city, "appid": API_KEY, "units": "metric", "lang": "pl"}
+            icon_code = data["weather"][0]["icon"]
+            icon_url = f"https://openweathermap.org/img/wn/{icon_code}@2x.png"
+            icon_response = requests.get(icon_url, timeout=10)
+            icon_img = Image.open(BytesIO(icon_response.content)).convert("RGBA")
+            icon_img = icon_img.resize((175, 175), Image.LANCZOS)
 
-    try:
-        response = requests.get(CURRENT_URL, params=params, timeout=10)
-        data = response.json()
-        if data.get("cod") != 200:
-            messagebox.showerror("Błąd", f"Nie znaleziono miasta: {city}")
-            return
+            forecast_response = requests.get(FORECAST_URL, params=params, timeout=10)
+            forecast_data = forecast_response.json()
 
-        temp = data["main"]["temp"]
-        feels_like = data["main"]["feels_like"]
-        humidity = data["main"]["humidity"]
-        wind_speed = data["wind"]["speed"]
-        desc = data["weather"][0]["description"].capitalize()
-        icon_code = data["weather"][0]["icon"]
+            root.after(0, _finish_success, city, data, icon_img, forecast_data)
+        except Exception as e:
+            root.after(0, _finish_error, f"Wystąpił problem:\n{e}")
 
-        city_label.config(text=city.upper())
-        weather_label.config(
-            text=f"{desc}\nTemperatura: {temp}°C (odczuwalna {feels_like}°C)\n"
-                 f"Wilgotność: {humidity}%\nWiatr: {wind_speed} m/s"
-        )
-
-        icon_url = f"https://openweathermap.org/img/wn/{icon_code}@2x.png"
-        icon_response = requests.get(icon_url, timeout=10)
-        icon_img = Image.open(BytesIO(icon_response.content)).convert("RGBA")
-        icon_img = icon_img.resize((175, 175), Image.LANCZOS)
-        icon_photo = ImageTk.PhotoImage(icon_img)
-        icon_label.config(image=icon_photo)
-        icon_label.image = icon_photo
-
-        forecast_response = requests.get(FORECAST_URL, params=params, timeout=10)
-        forecast_data_global = forecast_response.json()
-
-        # Po pobraniu nowych danych: zamknij i wyczyść poprzednie sekcje prognoz
-        close_all_forecasts()
-
-    except Exception as e:
-        messagebox.showerror("Błąd", f"Wystąpił problem:\n{e}")
+    threading.Thread(target=fetch_weather, daemon=True).start()
 
 # ---------- Rozwijane prognozy (pełna szerokość) ----------
+
+def _render_forecast(frame, selected):
+    for widget in frame.winfo_children():
+        widget.destroy()
+
+    canvas = tk.Canvas(frame, bg=BG_CARD, highlightthickness=0, borderwidth=0)
+    h_scrollbar = tk.Scrollbar(frame, orient="horizontal", command=canvas.xview, troughcolor=BG_CARD)
+    canvas.configure(xscrollcommand=h_scrollbar.set)
+
+    inner = tk.Frame(canvas, bg=BG_CARD)
+    canvas.create_window((0, 0), window=inner, anchor="nw")
+
+    canvas.pack(side="top", fill="both", expand=False)
+    h_scrollbar.pack(side="bottom", fill="x")
+
+    for i, forecast in enumerate(selected):
+        if frame == forecast_24h_frame:
+            time = forecast["time"]
+        else:
+            time = forecast["time"]
+        temp_f = forecast["temp"]
+        desc_f = forecast["desc"]
+        icon_photo_f = forecast["icon"]
+
+        col = tk.Frame(inner, bg=BG_CARD)
+        col.grid(row=0, column=i, padx=5, pady=5, sticky="n")
+        tk.Label(col, text=time, bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 10, "bold")).pack()
+        tk.Label(col, image=icon_photo_f, bg=BG_CARD).pack()
+        tk.Label(col, text=f"{temp_f}°C", bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 10)).pack()
+        tk.Label(
+            col,
+            text=desc_f,
+            bg=BG_CARD,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 9),
+            wraplength=140,
+            justify="center",
+        ).pack()
+
+    inner.update_idletasks()
+    canvas.config(scrollregion=canvas.bbox("all"))
+
+
+def _finish_forecast(frame, header, selected, animation_key):
+    _stop_loading_animation(animation_key)
+    _render_forecast(frame, selected)
+    frame.pack(after=header, fill="x", pady=(0, 15))
+
 
 def toggle_forecast(frame, hours, header):
     global forecast_icons_24h, forecast_icons_5d
@@ -205,55 +315,71 @@ def toggle_forecast(frame, hours, header):
     if hours == 24:
         selected = forecast_data_global["list"][:8]
         icons_list = forecast_icons_24h
+        animation_key = "forecast_24h"
     else:
         selected = forecast_data_global["list"][::8]
         icons_list = forecast_icons_5d
+        animation_key = "forecast_5d"
 
     icons_list.clear()
 
-    # Tworzymy canvas, który będzie poziomo przewijalny jeśli inner będzie szerszy niż canvas.
-    canvas = tk.Canvas(frame, bg=BG_CARD, highlightthickness=0, borderwidth=0)
-    h_scrollbar = tk.Scrollbar(frame, orient="horizontal", command=canvas.xview, troughcolor=BG_CARD)
-    canvas.configure(xscrollcommand=h_scrollbar.set)
-
-    inner = tk.Frame(canvas, bg=BG_CARD)
-    canvas.create_window((0, 0), window=inner, anchor="nw")
-
-    # Nie wymuszamy szerokości okna wewnętrznego na szerokość canvas — dzięki temu
-    # gdy kolumn jest dużo, inner stanie się szerszy i pojawi się poziomy scrollbar.
-    canvas.pack(side="top", fill="both", expand=False) #true???
-    h_scrollbar.pack(side="bottom", fill="x")
-
-    # Dodawanie kolumn prognoz
-    for i, forecast in enumerate(selected):
-        if frame == forecast_24h_frame:
-            time = forecast["dt_txt"].split()[1][:5]
-        else:
-            time = forecast["dt_txt"].split()[0]
-        temp_f = forecast["main"]["temp"]
-        desc_f = forecast["weather"][0]["description"].capitalize()
-        icon_code_f = forecast["weather"][0]["icon"]
-
-        icon_url_f = f"https://openweathermap.org/img/wn/{icon_code_f}@2x.png"
-        icon_response_f = requests.get(icon_url_f, timeout=10)
-        icon_img_f = Image.open(BytesIO(icon_response_f.content)).convert("RGBA")
-        icon_photo_f = ImageTk.PhotoImage(icon_img_f)
-        icons_list.append(icon_photo_f)
-
-        col = tk.Frame(inner, bg=BG_CARD)
-        # Ustawiamy grid tak aby kolumny były obok siebie i rozkładały się równomiernie
-        col.grid(row=0, column=i, padx=5, pady=5, sticky="n")
-        tk.Label(col, text=time, bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 10, "bold")).pack()
-        tk.Label(col, image=icon_photo_f, bg=BG_CARD).pack()
-        tk.Label(col, text=f"{temp_f}°C", bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 10)).pack()
-        tk.Label(col, text=desc_f, bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 9), wraplength=140, justify="center").pack()
-
-    # Ustaw scrollregion po ułożeniu elementów
-    inner.update_idletasks()
-    canvas.config(scrollregion=canvas.bbox("all"))
-
-    # Pokaż ramkę prognozy
+    loading_label = tk.Label(
+        frame,
+        text="Ładowanie prognozy",
+        bg=BG_CARD,
+        fg=TEXT_PRIMARY,
+        font=("Segoe UI", 11, "bold"),
+    )
+    loading_label.pack(pady=12)
     frame.pack(after=header, fill="x", pady=(0, 15))
+    _start_loading_animation(loading_label, "Ładowanie prognozy", animation_key)
+
+    def fetch_forecast():
+        forecasts = []
+        try:
+            for forecast in selected:
+                if frame == forecast_24h_frame:
+                    time = forecast["dt_txt"].split()[1][:5]
+                else:
+                    time = forecast["dt_txt"].split()[0]
+                temp_f = forecast["main"]["temp"]
+                desc_f = forecast["weather"][0]["description"].capitalize()
+                icon_code_f = forecast["weather"][0]["icon"]
+
+                icon_url_f = f"https://openweathermap.org/img/wn/{icon_code_f}@2x.png"
+                icon_response_f = requests.get(icon_url_f, timeout=10)
+                icon_bytes = icon_response_f.content
+                forecasts.append((time, temp_f, desc_f, icon_bytes))
+        except Exception:
+            forecasts = []
+
+        def render():
+            if not frame.winfo_exists():
+                return
+            if not forecasts:
+                _stop_loading_animation(animation_key)
+                loading_label.config(text="Nie udało się wczytać prognozy.")
+                return
+
+            prepared = []
+            for time, temp_f, desc_f, icon_bytes in forecasts:
+                icon_img_f = Image.open(BytesIO(icon_bytes)).convert("RGBA")
+                icon_photo_f = ImageTk.PhotoImage(icon_img_f)
+                icons_list.append(icon_photo_f)
+                prepared.append(
+                    {
+                        "time": time,
+                        "temp": temp_f,
+                        "desc": desc_f,
+                        "icon": icon_photo_f,
+                    }
+                )
+
+            _finish_forecast(frame, header, prepared, animation_key) 
+
+        root.after(0, render)
+
+    threading.Thread(target=fetch_forecast, daemon=True).start()
 
 
 def create_expandable_section(parent, title, hours, frame_forecast):
@@ -293,6 +419,18 @@ root = tk.Tk()
 root.title("Aplikacja pogodowa")
 root.geometry("760x600")
 root.configure(bg=BG_PRIMARY)
+
+# Nakładka ładowania
+loading_overlay = tk.Frame(root, bg=BG_PRIMARY)
+loading_label = tk.Label(
+    loading_overlay,
+    text="Ładowanie danych pogody...",
+    font=("Segoe UI", 16, "bold"),
+    bg=BG_PRIMARY,
+    fg=TEXT_PRIMARY,
+)
+loading_label.place(relx=0.5, rely=0.5, anchor="center")
+
 
 # Kontener z canvas + vertical scrollbar, aby cała aplikacja miała pionowy scrollbar
 container = tk.Frame(root, bg=BG_PRIMARY)

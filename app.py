@@ -10,11 +10,12 @@ API_KEY = "9f5d80b974ba325f52a205863ee448c6"
 CURRENT_URL = "https://api.openweathermap.org/data/2.5/weather"
 FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 
-BG_PRIMARY = "#0f172a"
-BG_CARD = "#1e293b"
-ACCENT = "#38bdf8"
-TEXT_PRIMARY = "#e2e8f0"
-TEXT_MUTED = "#94a3b8"
+BG_PRIMARY = "#cfe8f8"
+BG_CARD = "#95cbf0"
+ACCENT = "#0c7fb5"
+TEXT_PRIMARY = "#08243b"
+TEXT_MUTED = "#1c4763"
+INPUT_BG = "#b7dcf4"
 
 forecast_icons_24h = []
 forecast_icons_5d = []
@@ -362,7 +363,7 @@ city_entry = tk.Entry(
     width=30,
     relief="flat",
     borderwidth=0,
-    bg="#0b1220",
+    bg=INPUT_BG,
     fg=TEXT_PRIMARY,
     insertbackground=TEXT_PRIMARY,
 )
@@ -392,7 +393,7 @@ suggestion_box = tk.Listbox(
     font=("Segoe UI", 11),
     borderwidth=0,
     relief="flat",
-    bg="#0b1220",
+    bg=INPUT_BG,
     fg=TEXT_PRIMARY,
     highlightthickness=1,
     highlightbackground=ACCENT,

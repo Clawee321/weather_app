@@ -16,6 +16,7 @@ ACCENT = "#0c7fb5"
 TEXT_PRIMARY = "#08243b"
 TEXT_MUTED = "#1c4763"
 INPUT_BG = "#b7dcf4"
+INPUT_BORDER = "#8bbad6"
 
 forecast_icons_24h = []
 forecast_icons_5d = []
@@ -363,6 +364,9 @@ city_entry = tk.Entry(
     width=30,
     relief="flat",
     borderwidth=0,
+    highlightthickness=1,
+    highlightbackground=INPUT_BORDER,
+    highlightcolor=INPUT_BORDER,
     bg=INPUT_BG,
     fg=TEXT_PRIMARY,
     insertbackground=TEXT_PRIMARY,

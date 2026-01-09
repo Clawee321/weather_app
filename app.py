@@ -7,7 +7,7 @@ import pandas as pd
 import sys
 import threading
 
-API_KEY = "9f5d80b974ba325f52a205863ee448c6"
+API_KEY = "c6b8d4c1c00f01641121854c740183dd"
 CURRENT_URL = "https://api.openweathermap.org/data/2.5/weather"
 FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
 

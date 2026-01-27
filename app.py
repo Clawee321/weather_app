@@ -9,7 +9,8 @@ import threading
 
 API_KEY = "c6b8d4c1c00f01641121854c740183dd"
 CURRENT_URL = "https://api.openweathermap.org/data/2.5/weather"
-FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
+HOURLY_FORECAST_URL = "https://pro.openweathermap.org/data/2.5/forecast/hourly"
+DAILY_FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast/daily"
 
 BG_PRIMARY = "#cfe8f8"
 BG_CARD = "#95cbf0"
@@ -21,7 +22,7 @@ INPUT_BORDER = "#8bbad6"
 
 forecast_icons_24h = []
 forecast_icons_5d = []
-forecast_data_global = None
+forecast_data_global = {}
 loading_animation_id = None
 forecast_loading_ids = {}
 
@@ -239,8 +240,29 @@ def get_weather():
             icon_img = Image.open(BytesIO(icon_response.content)).convert("RGBA")
             icon_img = icon_img.resize((175, 175), Image.LANCZOS)
 
-            forecast_response = requests.get(FORECAST_URL, params=params, timeout=10)
-            forecast_data = forecast_response.json()
+            lat = data["coord"]["lat"]
+            lon = data["coord"]["lon"]
+            hourly_params = {
+                "lat": lat,
+                "lon": lon,
+                "appid": API_KEY,
+                "units": "metric",
+                "lang": "pl",
+            }
+            daily_params = {
+                "lat": lat,
+                "lon": lon,
+                "cnt": 7,
+                "appid": API_KEY,
+                "units": "metric",
+                "lang": "pl",
+            }
+            hourly_response = requests.get(HOURLY_FORECAST_URL, params=hourly_params, timeout=10)
+            daily_response = requests.get(DAILY_FORECAST_URL, params=daily_params, timeout=10)
+            forecast_data = {
+                "hourly": hourly_response.json(),
+                "daily": daily_response.json(),
+            }
 
             root.after(0, _finish_success, city, data, icon_img, forecast_data)
         except Exception as e:
@@ -298,7 +320,7 @@ def _finish_forecast(frame, header, selected, animation_key):
     frame.pack(after=header, fill="x", pady=(0, 15))
 
 
-def toggle_forecast(frame, hours, header):
+def toggle_forecast(frame, forecast_type, header):
     global forecast_icons_24h, forecast_icons_5d
     if not forecast_data_global:
         messagebox.showwarning("Brak danych", "Najpierw pobierz pogodę!")
@@ -312,12 +334,12 @@ def toggle_forecast(frame, hours, header):
     for widget in frame.winfo_children():
         widget.destroy()
 
-    if hours == 24:
-        selected = forecast_data_global["list"][:8]
+    if forecast_type == "hourly":
+        selected = forecast_data_global.get("hourly", {}).get("list", [])[:24]
         icons_list = forecast_icons_24h
         animation_key = "forecast_24h"
     else:
-        selected = forecast_data_global["list"][::8]
+        selected = forecast_data_global.get("daily", {}).get("list", [])[:7]
         icons_list = forecast_icons_5d
         animation_key = "forecast_5d"
 
@@ -338,13 +360,16 @@ def toggle_forecast(frame, hours, header):
         forecasts = []
         try:
             for forecast in selected:
-                if frame == forecast_24h_frame:
-                    time = forecast["dt_txt"].split()[1][:5]
+                if forecast_type == "hourly":
+                    time = pd.to_datetime(forecast["dt"], unit="s").strftime("%H:%M")
+                    temp_f = forecast["main"]["temp"]
+                    desc_f = forecast["weather"][0]["description"].capitalize()
+                    icon_code_f = forecast["weather"][0]["icon"]
                 else:
-                    time = forecast["dt_txt"].split()[0]
-                temp_f = forecast["main"]["temp"]
-                desc_f = forecast["weather"][0]["description"].capitalize()
-                icon_code_f = forecast["weather"][0]["icon"]
+                    time = pd.to_datetime(forecast["dt"], unit="s").strftime("%Y-%m-%d")
+                    temp_f = forecast["temp"]["day"]
+                    desc_f = forecast["weather"][0]["description"].capitalize()
+                    icon_code_f = forecast["weather"][0]["icon"]
 
                 icon_url_f = f"https://openweathermap.org/img/wn/{icon_code_f}@2x.png"
                 icon_response_f = requests.get(icon_url_f, timeout=10)
@@ -382,7 +407,7 @@ def toggle_forecast(frame, hours, header):
     threading.Thread(target=fetch_forecast, daemon=True).start()
 
 
-def create_expandable_section(parent, title, hours, frame_forecast):
+def create_expandable_section(parent, title, forecast_type, frame_forecast):
     header = tk.Frame(parent, bg=BG_CARD)
     header.pack(fill="x", pady=(5, 0))
 
@@ -399,7 +424,7 @@ def create_expandable_section(parent, title, hours, frame_forecast):
         if frame_forecast.forget_flag:
             frame_forecast.forget_flag = False
             icon_label.config(text=OPEN_ICON)
-            toggle_forecast(frame_forecast, hours, header)
+            toggle_forecast(frame_forecast, forecast_type, header)
         else:
             frame_forecast.forget_flag = True
             icon_label.config(text=CLOSED_ICON)
@@ -574,7 +599,7 @@ weather_label.pack(pady=(5, 20))
 forecast_24h_frame = tk.Frame(card_frame, bg=BG_CARD)
 forecast_5d_frame = tk.Frame(card_frame, bg=BG_CARD)
 
-create_expandable_section(card_frame, "Prognoza 24h", 24, forecast_24h_frame)
-create_expandable_section(card_frame, "Prognoza 5 dni", 120, forecast_5d_frame)
+create_expandable_section(card_frame, "Prognoza 24h", "hourly", forecast_24h_frame)
+create_expandable_section(card_frame, "Prognoza 7 dni", "daily", forecast_5d_frame)
 
 root.mainloop()
